@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>한탕이의 생존 신고 (Optimized)</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #101020; font-family: 'Black Han Sans', sans-serif; user-select: none; }
+        
+        @import url('https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Gowun+Batang&display=swap');
+
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        #top-bar { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; align-items: center; opacity: 0; transition: opacity 0.5s; }
+        .stat-box { background: rgba(0, 0, 0, 0.7); padding: 10px 20px; border-radius: 15px; color: #fff; border: 2px solid #555; font-size: 20px; display: flex; align-items: center; gap: 10px; }
+        #score { color: #ffd700; }
+        #timer { color: #fff; min-width: 60px; text-align: center; }
+        #hp-box { color: #ff5555; border-color: #ff5555; }
+        #bomb-box { color: #00ffaa; border-color: #00ffaa; }
+        #exp-bar-container { position: absolute; top: 0; left: 0; width: 100%; height: 10px; background: #333; z-index: 10; opacity: 0; transition: opacity 0.5s; }
+        #exp-bar { width: 0%; height: 100%; background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%); transition: width 0.2s; }
+        #level-indicator { position: absolute; top: 15px; right: 20px; color: #00f2fe; font-size: 30px; text-shadow: 2px 2px 0 #000; opacity: 0; transition: opacity 0.5s; }
+        
+        #start-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 300; pointer-events: auto; display: flex; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        .start-title { font-size: 80px; color: #ffd700; text-shadow: 0 0 20px #ff5500; margin-bottom: 20px; animation: float 3s infinite ease-in-out; }
+        .start-btn { padding: 20px 60px; font-size: 30px; background: linear-gradient(45deg, #ff0055, #ff5500); color: white; border: 4px solid white; border-radius: 50px; cursor: pointer; transition: transform 0.2s; font-family: 'Black Han Sans', sans-serif; }
+        .start-btn:hover { transform: scale(1.1); }
+        .camera-label-container { position: absolute; bottom: 10%; width: 100%; display: flex; justify-content: center; gap: 40px; pointer-events: none; color: rgba(255,255,255,0.3); font-size: 20px; }
+        .cam-label { transition: all 0.5s; }
+        .cam-active { color: #00ffff; font-weight: bold; transform: scale(1.2); text-shadow: 0 0 10px #00ffff; opacity: 1; }
+
+        #levelup-modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; pointer-events: auto; flex-direction: column; justify-content: center; align-items: center; }
+        .modal-title { font-size: 50px; color: #ffd700; margin-bottom: 30px; }
+        .card-container { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+        .upgrade-card { width: 200px; height: 280px; background: linear-gradient(135deg, #2a2a2a, #1a1a1a); border: 3px solid #666; border-radius: 10px; padding: 15px; display: flex; flex-direction: column; align-items: center; text-align: center; cursor: pointer; transition: transform 0.2s; }
+        .upgrade-card:hover { transform: translateY(-10px); border-color: #fff; background: #333; }
+        .card-icon { font-size: 50px; margin-bottom: 10px; }
+        .card-name { font-size: 24px; color: #fff; margin-bottom: 10px; color: #00ff00; }
+        .card-desc { font-size: 16px; color: #ccc; font-family: 'Gowun Batang', serif; line-height: 1.4; }
+        .card-level { margin-top: auto; font-size: 14px; color: #888; }
+
+        #game-over-screen { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(50,0,0,0.8); z-index: 200; pointer-events: auto; flex-direction: column; justify-content: center; align-items: center; color: white; }
+        .go-title { font-size: 80px; color: #ff0055; margin-bottom: 20px; }
+        .go-score { font-size: 30px; margin-bottom: 40px; }
+        
+        #ult-guide { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,0.7); font-size: 18px; opacity: 0; transition: opacity 0.5s; }
+        .damage-text { position: absolute; color: white; font-weight: bold; font-size: 20px; pointer-events: none; text-shadow: 1px 1px 0 #000; animation: popUp 0.8s forwards; white-space: nowrap; }
+        .mincho-text { color: #00ffaa !important; font-size: 24px !important; text-shadow: 0 0 5px #00ffaa; }
+        .death-quote { color: #ffff00; font-size: 18px; font-family: 'Gowun Batang', serif; text-shadow: 1px 1px 2px #000; z-index: 5; }
+        @keyframes float { 0% { transform: translateY(0); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0); } }
+        @keyframes popUp { 0% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-40px) scale(0.8); } }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div id="exp-bar-container"><div id="exp-bar"></div></div>
+    
+    <div id="ui-layer">
+        <div id="level-indicator">LV. <span id="level-val">1</span></div>
+        <div id="top-bar">
+            <div class="stat-box" id="hp-box">HP <span id="hp-val">100</span></div>
+            <div class="stat-box" id="bomb-box">💣 <span id="bomb-val">1</span> <span id="bomb-cooldown" style="font-size:14px; color:#aaa; margin-left:5px;">(0%)</span></div>
+            <div class="stat-box">TIME <span id="timer">00:00</span></div>
+            <div class="stat-box">KILL <span id="kill-count">0</span></div>
+        </div>
+        <div id="ult-guide">[SPACE] 필살기: 화면 전체 공격</div>
+        <div id="damage-layer"></div>
+    </div>
+
+    <div id="start-screen">
+        <div class="start-title">한탕이의 생존 신고</div>
+        <button class="start-btn" id="start-btn">생존 시작 (최적화 ON)</button>
+        <div class="camera-label-container">
+            <div id="cam-label-0" class="cam-label cam-active">CAM 1: 얼짱 각도</div>
+            <div id="cam-label-1" class="cam-label">CAM 2: 전신 스캔</div>
+            <div id="cam-label-2" class="cam-label">CAM 3: 위성 감시</div>
+        </div>
+    </div>
+
+    <div id="levelup-modal">
+        <div class="modal-title">레벨 업!</div>
+        <div class="card-container" id="upgrade-cards"></div>
+    </div>
+
+    <div id="game-over-screen">
+        <div class="go-title">사 망</div>
+        <div class="go-score">최종 기록: <span id="final-time">00:00</span> / 처치: <span id="final-kills">0</span></div>
+        <button onclick="location.reload()">다시 도전하기</button>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+
+        // ==========================================
+        // [핵심 최적화] 전역 리소스 공유 및 풀링 설정
+        // ==========================================
+        const _tempVec1 = new THREE.Vector3();
+        const _tempVec2 = new THREE.Vector3();
+        
+        // 지오메트리 & 재질 (딱 1번만 생성해서 돌려씀)
+        const GEOMETRY = {
+            qr: new THREE.BoxGeometry(0.2, 0.2, 0.8),
+            contract: new THREE.BoxGeometry(0.8, 0.1, 0.5),
+            heart: new THREE.SphereGeometry(0.4, 6, 6), // 세그먼트 최소화
+            male: new THREE.BoxGeometry(1, 1.5, 1),
+            female: new THREE.CylinderGeometry(0.4, 0.4, 1.5, 8),
+            boss: new THREE.BoxGeometry(2, 4, 2),
+            hpBg: new THREE.PlaneGeometry(1, 0.15),
+            hpFg: new THREE.PlaneGeometry(1, 0.15)
+        };
+        GEOMETRY.hpFg.translate(0.5, 0, 0); // 체력바 왼쪽 정렬
+
+        const MATERIALS = {
+            qr: new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+            contract: new THREE.MeshStandardMaterial({ color: 0xffffff }),
+            heart: new THREE.MeshBasicMaterial({ color: 0xff0055 }), // Basic으로 변경 (연산 감소)
+            male: new THREE.MeshStandardMaterial({ color: 0x3366ff }),
+            female: new THREE.MeshStandardMaterial({ color: 0xff66cc }),
+            boss: new THREE.MeshStandardMaterial({ color: 0xff4400 }),
+            hpBg: new THREE.MeshBasicMaterial({ color: 0x333333, depthTest: false }),
+            hpRed: new THREE.MeshBasicMaterial({ color: 0xff0000, depthTest: false }),
+            hpGreen: new THREE.MeshBasicMaterial({ color: 0x00ff00, depthTest: false }),
+            hpBoss: new THREE.MeshBasicMaterial({ color: 0xffaa00, depthTest: false })
+        };
+
+        // 오브젝트 풀 (메모리 재활용 창고)
+        const POOLS = {
+            enemies: [],
+            projectiles: [],
+            enemyProjectiles: [],
+            damageTexts: [] // DOM 요소도 제한
+        };
+        const MAX_POOL_SIZE = { enemy: 200, projectile: 100, enemyProjectile: 50 }; // 최대 개수 제한
+
+        // ==========================================
+        // 1. 초기화
+        // ==========================================
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a1a2e); 
+        scene.fog = new THREE.Fog(0x1a1a2e, 20, 60);
+
+        const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 1000);
+        camera.position.set(20, 20, 20); camera.lookAt(0, 0, 0); camera.zoom = 1.2;
+
+        // 시작화면 카메라들
+        const startCams = [
+            new THREE.PerspectiveCamera(45, 1, 0.1, 100),
+            new THREE.PerspectiveCamera(45, 1, 0.1, 100),
+            new THREE.PerspectiveCamera(45, 1, 0.1, 100)
+        ];
+        startCams[0].position.set(2, 1.5, 2); startCams[0].lookAt(0, 1, 0);
+        startCams[1].position.set(0, 2, 6); startCams[1].lookAt(0, 1, 0);
+        startCams[2].position.set(0, 10, 0); startCams[2].lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" }); // 안티알리어싱 끔 (성능)
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.BasicShadowMap; // 가장 싼 그림자
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0x606060);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        dirLight.position.set(10, 20, 10);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 1024; dirLight.shadow.mapSize.height = 1024;
+        scene.add(dirLight);
+
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 }));
+        ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
+        scene.add(ground);
+        scene.add(new THREE.GridHelper(200, 100, 0x444444, 0x333333));
+
+        // ==========================================
+        // 2. 플레이어 및 풀링 시스템 구축
+        // ==========================================
+        const playerGroup = new THREE.Group();
+        scene.add(playerGroup);
+        const playerMesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0x00ff00 }));
+        playerMesh.position.y = 0.5; playerMesh.castShadow = true;
+        playerGroup.add(playerMesh);
+
+        // 플레이어 체력바
+        const pHpGroup = new THREE.Group();
+        pHpGroup.position.y = 2.0;
+        pHpGroup.add(new THREE.Mesh(GEOMETRY.hpBg, MATERIALS.hpBg));
+        const pHpFg = new THREE.Mesh(GEOMETRY.hpFg, MATERIALS.hpGreen);
+        pHpFg.position.x = -0.5; pHpFg.position.z = 0.01;
+        pHpGroup.add(pHpFg);
+        playerGroup.add(pHpGroup);
+        pHpGroup.visible = false;
+
+        const mistMesh = new THREE.Mesh(new THREE.RingGeometry(0.5, 4, 32), new THREE.MeshBasicMaterial({ color: 0x800080, transparent: true, opacity: 0.0 }));
+        mistMesh.rotation.x = -Math.PI/2; mistMesh.position.y = 0.1;
+        playerGroup.add(mistMesh);
+
+        // ★ 오브젝트 풀 초기화 (미리 생성) ★
+        function initPools() {
+            // 적 풀 생성
+            for(let i=0; i<MAX_POOL_SIZE.enemy; i++) {
+                const mesh = new THREE.Mesh(GEOMETRY.male, MATERIALS.male); // 기본값 male
+                mesh.visible = false;
+                mesh.castShadow = false; // 일반 적 그림자 끔 (성능)
+                
+                // 체력바 미리 부착
+                const hpGroup = new THREE.Group();
+                hpGroup.position.y = 2.0;
+                hpGroup.add(new THREE.Mesh(GEOMETRY.hpBg, MATERIALS.hpBg));
+                const hpFg = new THREE.Mesh(GEOMETRY.hpFg, MATERIALS.hpRed);
+                hpFg.position.x = -0.5; hpFg.position.z = 0.01;
+                hpGroup.add(hpFg);
+                mesh.add(hpGroup);
+                mesh.userData.hpFg = hpFg; // 빠른 접근용
+                mesh.userData.hpGroup = hpGroup;
+
+                scene.add(mesh);
+                POOLS.enemies.push(mesh);
+            }
+            // 투사체 풀
+            for(let i=0; i<MAX_POOL_SIZE.projectile; i++) {
+                const mesh = new THREE.Mesh(GEOMETRY.qr, MATERIALS.qr);
+                mesh.visible = false;
+                scene.add(mesh);
+                POOLS.projectiles.push(mesh);
+            }
+            // 적 투사체 풀
+            for(let i=0; i<MAX_POOL_SIZE.enemyProjectile; i++) {
+                const mesh = new THREE.Mesh(GEOMETRY.heart, MATERIALS.heart);
+                mesh.visible = false;
+                scene.add(mesh);
+                POOLS.enemyProjectiles.push(mesh);
+            }
+        }
+        initPools();
+
+        // 모델 로더 (있으면 모델로 교체, 없으면 기본 유지)
+        const loader = new GLTFLoader();
+        let playerMixer;
+        loader.load('./player.glb', (gltf) => {
+            const m = gltf.scene; m.scale.set(1,1,1); m.traverse(o=>{if(o.isMesh)o.castShadow=true;});
+            playerGroup.remove(playerMesh); playerGroup.add(m);
+            playerMixer = new THREE.AnimationMixer(m);
+            if(gltf.animations.length) playerMixer.clipAction(gltf.animations[0]).play();
+        });
+
+        // ==========================================
+        // 3. 게임 로직
+        // ==========================================
+        const gameState = {
+            gameStarted: false, isPlaying: true, isPaused: false, time: 0,
+            level: 1, exp: 0, maxExp: 10, kills: 0, hp: 100, maxHp: 100,
+            bombs: 1, bombTimer: 0, quoteChance: 0, cameraIndex: 0, cameraTimer: 0
+        };
+        const activeEnemies = []; // 현재 활동 중인 적 목록
+        const activeProjectiles = [];
+        const activeEnemyProjectiles = [];
+        const gems = [];
+        const minchos = [];
+
+        const playerStats = { moveSpeed: 0.15, damageMult: 1.0, pickupRange: 3.0, attackSpeed: 1.0 };
+        const inventory = {
+            qrBeam: { level: 1, active: true, cooldown: 0.8, lastShot: 0, damage: 10 },
+            nftContract: { level: 0, active: true, throwChance: 0.01, bossDmgRate: 0.10 },
+            mist: { level: 0, active: false, cooldown: 0.5, lastTick: 0, damage: 3, range: 4 },
+            movingMan: { level: 0, val: 0.1 }, 
+            chunjat: { level: 0, val: 0.05 }, clover: { level: 0, val: 0.2 }
+        };
+        const keys = { w:false, a:false, s:false, d:false, " ":false };
+        const deathQuotes = { female: ["여자는 안되나요", "겸상해요"], male: ["게이조이고", "죄송합니다", "니.니게 그런", "어~~~~~♬"], boss: ["해고라니!!", "퇴직금은..?", "회식.."] };
+
+        window.addEventListener('keydown', e => keys[e.key] = true);
+        window.addEventListener('keyup', e => keys[e.key] = false);
+        document.getElementById('start-btn').addEventListener('click', () => {
+            gameState.gameStarted = true;
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('top-bar').style.opacity = '1';
+            document.getElementById('exp-bar-container').style.opacity = '1';
+            document.getElementById('level-indicator').style.opacity = '1';
+            document.getElementById('ult-guide').style.opacity = '1';
+            pHpGroup.visible = true;
+        });
+
+        // ★ 풀에서 적 꺼내오기 (핵심) ★
+        function spawnEnemy(isBoss = false) {
+            if (gameState.isPaused) return;
+            
+            // 사용 가능한(숨겨진) 메쉬 찾기
+            const mesh = POOLS.enemies.find(e => !e.visible);
+            if (!mesh) return; // 풀 꽉 참 (더 이상 생성 안함 = 렉 방지)
+
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 15 + Math.random() * 10;
+            const x = playerGroup.position.x + Math.cos(angle) * dist;
+            const z = playerGroup.position.z + Math.sin(angle) * dist;
+
+            let type = isBoss ? 'boss' : (Math.random() > 0.7 ? 'female' : 'male');
+            let hp = 15 + (gameState.time * 0.5);
+            if (type === 'female') hp *= 0.7;
+            if (type === 'boss') hp = hp * 50 + 500;
+
+            // 타입에 따라 메쉬 설정 재활용
+            mesh.geometry = GEOMETRY[type];
+            mesh.material = MATERIALS[type];
+            mesh.castShadow = isBoss; // 보스만 그림자
+            
+            // 위치 리셋
+            mesh.position.set(x, isBoss ? 2 : 0.75, z);
+            mesh.visible = true;
+
+            // 체력바 재설정
+            const hpMat = isBoss ? MATERIALS.hpBoss : MATERIALS.hpRed;
+            mesh.userData.hpFg.material = hpMat;
+            mesh.userData.hpGroup.position.y = isBoss ? 2.5 : 1.5;
+            mesh.userData.hpGroup.scale.set(isBoss?3:1, isBoss?2:1, 1);
+            mesh.userData.hpFg.scale.x = 1; // 체력 가득
+
+            // 데이터 리셋
+            mesh.userData = { 
+                type: type, hp: hp, maxHp: hp, 
+                speed: isBoss ? 0.03 : (type === 'female' ? 0.04 : 0.05),
+                attackCooldown: 0, isBoss: isBoss,
+                hpFg: mesh.userData.hpFg, // 참조 유지
+                hpGroup: mesh.userData.hpGroup
+            };
+
+            activeEnemies.push(mesh);
+        }
+
+        function spawnProjectile(type, pos, dir, userData) {
+            const pool = (type === 'enemy') ? POOLS.enemyProjectiles : POOLS.projectiles;
+            const mesh = pool.find(p => !p.visible);
+            if (!mesh) return;
+
+            mesh.geometry = (type === 'contract') ? GEOMETRY.contract : (type === 'enemy' ? GEOMETRY.heart : GEOMETRY.qr);
+            mesh.material = (type === 'contract') ? MATERIALS.contract : (type === 'enemy' ? MATERIALS.heart : MATERIALS.qr);
+            
+            mesh.position.copy(pos);
+            mesh.visible = true;
+            mesh.userData = { ...userData, life: userData.duration || 2 }; // 복사
+            
+            // 방향 바라보기
+            if (type === 'enemy') mesh.lookAt(playerGroup.position);
+            else if (type === 'qr') mesh.lookAt(pos.x + dir.x, pos.y, pos.z + dir.z);
+
+            if (type === 'enemy') activeEnemyProjectiles.push(mesh);
+            else activeProjectiles.push(mesh);
+        }
+
+        // 데미지 처리 및 죽음 (죽으면 풀로 반환)
+        function takeDamage(enemy, amount) {
+            enemy.userData.hp -= amount;
+            
+            // 3D 체력바 업데이트
+            const pct = Math.max(0, enemy.userData.hp / enemy.userData.maxHp);
+            enemy.userData.hpFg.scale.x = pct;
+
+            // 데미지 텍스트 (DOM 제한)
+            if (Math.random() < 0.3) createDamageText(enemy.position, Math.floor(amount)); // 너무 많으면 정신없으니 30%만 표시
+
+            if (enemy.userData.hp <= 0) {
+                // 죽음 처리
+                if (Math.random() * 100 < gameState.quoteChance && deathQuotes[enemy.userData.type]) {
+                    const q = deathQuotes[enemy.userData.type];
+                    createDamageText(enemy.position, q[Math.floor(Math.random()*q.length)], false, true);
+                }
+                
+                spawnGem(enemy.position, enemy.userData.isBoss ? 50 : 1);
+                if(Math.random()<0.01) spawnMincho(enemy.position);
+                
+                gameState.kills++;
+                document.getElementById('kill-count').innerText = gameState.kills;
+
+                // ★ 풀로 반환 (삭제 대신 숨김) ★
+                enemy.visible = false;
+                const idx = activeEnemies.indexOf(enemy);
+                if (idx > -1) activeEnemies.splice(idx, 1);
+            }
+        }
+
+        // 텍스트는 DOM 사용 (개수 제한으로 최적화)
+        let dmgTextCount = 0;
+        function createDamageText(pos, text, isMincho, isQuote) {
+            if (dmgTextCount > 20 && !isMincho && !isQuote) return; // 20개 넘으면 생략
+            
+            const div = document.createElement('div');
+            div.className = isQuote ? 'damage-text death-quote' : (isMincho ? 'damage-text mincho-text' : 'damage-text');
+            div.innerText = text;
+            
+            _tempVec1.copy(pos);
+            if(isQuote) _tempVec1.y += 2;
+            _tempVec1.project(camera);
+            
+            const x = (_tempVec1.x * .5 + .5) * window.innerWidth;
+            const y = (-(_tempVec1.y * .5) + .5) * window.innerHeight;
+            
+            if(x<0||x>window.innerWidth||y<0||y>window.innerHeight) return; // 화면 밖이면 생성 안함
+
+            div.style.left = x + 'px'; div.style.top = y + 'px';
+            document.getElementById('damage-layer').appendChild(div);
+            dmgTextCount++;
+            setTimeout(() => { div.remove(); dmgTextCount--; }, isQuote ? 2000 : 800);
+        }
+
+        // 아이템 (젬, 민초) - 여기는 간단히 Mesh 생성/삭제 유지 (개수가 적어서)
+        function spawnGem(pos, val) {
+            const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.3), new THREE.MeshBasicMaterial({color:0x00ffff}));
+            m.position.copy(pos); m.position.y=0.5; m.userData={val:val};
+            scene.add(m); gems.push(m);
+        }
+        function spawnMincho(pos) {
+            const m = new THREE.Mesh(new THREE.SphereGeometry(0.4,4,4), new THREE.MeshBasicMaterial({color:0x00ffaa}));
+            m.position.copy(pos); m.position.y=0.5;
+            scene.add(m); minchos.push(m);
+        }
+
+        function getNearest() {
+            let n=null, min=Infinity;
+            for(const e of activeEnemies) {
+                const d = playerGroup.position.distanceToSquared(e.position);
+                if(d<min) { min=d; n=e; }
+            }
+            return { enemy: n, dist: Math.sqrt(min) };
+        }
+
+        // ==========================================
+        // 루프 및 업데이트
+        // ==========================================
+        const clock = new THREE.Clock();
+        
+        setInterval(() => {
+            if (!gameState.gameStarted || !gameState.isPlaying || gameState.isPaused) return;
+            const count = 2 + Math.floor(gameState.time / 20);
+            for(let i=0; i<count; i++) spawnEnemy();
+            if(gameState.time>0 && gameState.time%60===0) spawnEnemy(true);
+            
+            gameState.time++;
+            if(gameState.time%10===0) gameState.quoteChance = Math.min(20, gameState.quoteChance+1);
+            
+            const m = Math.floor(gameState.time/60).toString().padStart(2,'0');
+            const s = (gameState.time%60).toString().padStart(2,'0');
+            document.getElementById('timer').innerText = `${m}:${s}`;
+        }, 1000);
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+
+            // 시작 화면 카메라 연출
+            if (!gameState.gameStarted) {
+                if(playerMixer) playerMixer.update(delta);
+                playerGroup.rotation.y += delta * 0.5;
+                gameState.cameraTimer += delta;
+                if(gameState.cameraTimer >= 3.0) {
+                    gameState.cameraTimer = 0;
+                    document.getElementById(`cam-label-${gameState.cameraIndex}`).classList.remove('cam-active');
+                    gameState.cameraIndex = (gameState.cameraIndex+1)%3;
+                    document.getElementById(`cam-label-${gameState.cameraIndex}`).classList.add('cam-active');
+                }
+                const cams = [startCams[0], startCams[1], startCams[2]];
+                
+                // 풀스크린 렌더링
+                renderer.render(scene, cams[gameState.cameraIndex]);
+                return;
+            }
+
+            if (!gameState.isPlaying || gameState.isPaused) return;
+
+            // 필살기
+            if (keys[' ']) {
+                if(gameState.bombs > 0) {
+                    gameState.bombs--;
+                    document.getElementById('bomb-val').innerText = gameState.bombs;
+                    // 활성 적 전체 즉사 처리
+                    for(let i=activeEnemies.length-1; i>=0; i--) takeDamage(activeEnemies[i], 99999);
+                    keys[' '] = false;
+                }
+            }
+            gameState.bombTimer += delta;
+            if(gameState.bombTimer >= BOMB_COOLDOWN_TIME) { gameState.bombs++; gameState.bombTimer=0; document.getElementById('bomb-val').innerText=gameState.bombs; }
+            document.getElementById('bomb-cooldown').innerText = `(${Math.min(100, Math.floor(gameState.bombTimer/BOMB_COOLDOWN_TIME*100))}%)`;
+
+            // 플레이어 이동
+            _tempVec1.set(0,0,0);
+            if(keys.w) _tempVec1.z -= 1; if(keys.s) _tempVec1.z += 1;
+            if(keys.a) _tempVec1.x -= 1; if(keys.d) _tempVec1.x += 1;
+            if(_tempVec1.lengthSq() > 0) {
+                _tempVec1.normalize().multiplyScalar(playerStats.moveSpeed);
+                playerGroup.position.add(_tempVec1);
+                const rot = Math.atan2(_tempVec1.x, _tempVec1.z);
+                if(playerMixer) playerGroup.children.forEach(c=>{if(c.isGroup) c.rotation.y=rot;});
+            }
+
+            // 카메라 추적
+            camera.position.set(playerGroup.position.x+20, 20, playerGroup.position.z+20);
+            dirLight.position.set(playerGroup.position.x+10, 20, playerGroup.position.z+10);
+            ground.position.set(playerGroup.position.x, 0, playerGroup.position.z); // 무한 바닥
+
+            // 렌더링 최적화: 플레이어 체력바 빌보드
+            const pHp = playerGroup.children.find(c=>c.children && c.children.length>1); // 대충 찾기
+            if(pHp) {
+                pHp.lookAt(camera.position.x, 1000, camera.position.z);
+                pHp.children[1].scale.x = Math.max(0, gameState.hp/gameState.maxHp);
+            }
+
+            // --- 무기 발사 ---
+            const as = playerStats.attackSpeed;
+            if(inventory.qrBeam.active) {
+                inventory.qrBeam.lastShot += delta * as;
+                if(inventory.qrBeam.lastShot >= inventory.qrBeam.cooldown) {
+                    const t = getNearest();
+                    if(t.enemy && t.dist < 15) {
+                        _tempVec2.subVectors(t.enemy.position, playerGroup.position).normalize();
+                        spawnProjectile('qr', playerGroup.position, _tempVec2, { 
+                            velocity: _tempVec2.clone().multiplyScalar(0.4), 
+                            damage: inventory.qrBeam.damage * playerStats.damageMult 
+                        });
+                        // NFT 계약서
+                        if(Math.random() < inventory.nftContract.throwChance) {
+                            spawnProjectile('contract', playerGroup.position, _tempVec2, {
+                                type: 'contract', velocity: _tempVec2.clone().multiplyScalar(0.3),
+                                bossDmgRate: inventory.nftContract.bossDmgRate, pierce: 5, hitList: []
+                            });
+                        }
+                        inventory.qrBeam.lastShot = 0;
+                    }
+                }
+            }
+            if(inventory.mist.active) {
+                mistMesh.material.opacity = 0.3 + Math.sin(Date.now()/200)*0.1;
+                mistMesh.scale.setScalar(inventory.mist.range);
+                inventory.mist.lastTick += delta * as;
+                if(inventory.mist.lastTick >= inventory.mist.cooldown) {
+                    for(const e of activeEnemies) {
+                        if(playerGroup.position.distanceToSquared(e.position) <= inventory.mist.range**2) {
+                            takeDamage(e, inventory.mist.damage * playerStats.damageMult);
+                        }
+                    }
+                    inventory.mist.lastTick = 0;
+                }
+            } else mistMesh.material.opacity = 0;
+
+            if(playerMixer) playerMixer.update(delta);
+
+            // --- 업데이트 루프 (역순 순회 X, 풀링이므로 visible 체크) ---
+            
+            // 1. 투사체
+            for (let i = activeProjectiles.length - 1; i >= 0; i--) {
+                const p = activeProjectiles[i];
+                if (!p.visible) { activeProjectiles.splice(i, 1); continue; }
+                
+                p.position.add(p.userData.velocity);
+                if (p.userData.type === 'contract') p.rotation.y += 0.2;
+                p.userData.life -= delta;
+                
+                if (p.userData.life <= 0) { p.visible = false; activeProjectiles.splice(i, 1); continue; }
+
+                // 충돌 체크 (거리 제곱)
+                for (const e of activeEnemies) {
+                    const dx = p.position.x - e.position.x;
+                    const dz = p.position.z - e.position.z;
+                    if (dx*dx + dz*dz < 2.25) { // 1.5^2
+                        if (p.userData.hitList && p.userData.hitList.includes(e.uuid)) continue;
+                        
+                        let dmg = p.userData.damage;
+                        if (p.userData.type === 'contract') dmg = e.userData.isBoss ? e.userData.maxHp * p.userData.bossDmgRate : e.userData.hp;
+                        
+                        takeDamage(e, dmg);
+                        if (p.userData.hitList) p.userData.hitList.push(e.uuid);
+                        
+                        if (p.userData.type !== 'contract') { p.visible = false; activeProjectiles.splice(i, 1); break; }
+                        else if (p.userData.hitList.length >= p.userData.pierce) { p.visible = false; activeProjectiles.splice(i, 1); break; }
+                    }
+                }
+            }
+
+            // 2. 적 투사체
+            for (let i = activeEnemyProjectiles.length - 1; i >= 0; i--) {
+                const p = activeEnemyProjectiles[i];
+                if (!p.visible) { activeEnemyProjectiles.splice(i, 1); continue; }
+                
+                p.position.add(p.userData.velocity);
+                p.userData.life -= delta;
+                
+                const dx = p.position.x - playerGroup.position.x;
+                const dz = p.position.z - playerGroup.position.z;
+                if (dx*dx + dz*dz < 1) { // 플레이어 피격
+                    gameState.hp = Math.max(0, gameState.hp - p.userData.damage);
+                    document.getElementById('hp-val').innerText = Math.floor(gameState.hp);
+                    if(gameState.hp<=0) gameOver();
+                    p.visible = false; activeEnemyProjectiles.splice(i, 1); continue;
+                }
+                if (p.userData.life <= 0) { p.visible = false; activeEnemyProjectiles.splice(i, 1); }
+            }
+
+            // 3. 적
+            for (const e of activeEnemies) {
+                // 체력바 빌보드
+                e.userData.hpGroup.lookAt(camera.position.x, 1000, camera.position.z);
+                e.userData.hpGroup.rotation.x = -Math.PI/2;
+
+                const distSq = playerGroup.position.distanceToSquared(e.position);
+                _tempVec2.subVectors(playerGroup.position, e.position).normalize();
+
+                if (e.userData.type === 'male' || e.userData.type === 'boss') {
+                    e.position.add(_tempVec2.multiplyScalar(e.userData.speed));
+                    if (distSq < (e.userData.isBoss ? 6.25 : 0.64)) { // 2.5^2 or 0.8^2
+                        gameState.hp -= (e.userData.isBoss ? 0.2 : 0.05); // 데미지 빈도 조절
+                        document.getElementById('hp-val').innerText = Math.floor(gameState.hp);
+                        if(gameState.hp<=0) gameOver();
+                    }
+                } else { // 원거리
+                    if (distSq > 64) e.position.add(_tempVec2.multiplyScalar(e.userData.speed));
+                    e.userData.attackCooldown -= delta;
+                    if (e.userData.attackCooldown <= 0 && distSq < 144) {
+                        _tempVec2.normalize(); // 방향 재정규화
+                        spawnProjectile('enemy', e.position, null, { velocity: _tempVec2.multiplyScalar(0.15), damage: 10, duration: 4 });
+                        e.userData.attackCooldown = 2.0;
+                    }
+                }
+                e.lookAt(playerGroup.position);
+            }
+
+            // 아이템
+            for (let i=gems.length-1; i>=0; i--) {
+                const g = gems[i];
+                if (playerGroup.position.distanceToSquared(g.position) < playerStats.pickupRange**2) {
+                    g.position.lerp(playerGroup.position, 0.2);
+                    if (playerGroup.position.distanceToSquared(g.position) < 0.25) {
+                        gameState.exp += g.userData.val; scene.remove(g); gems.splice(i,1); checkLevelUp();
+                    }
+                } else g.rotation.y += 0.1;
+            }
+            for (let i=minchos.length-1; i>=0; i--) {
+                const m = minchos[i];
+                if (playerGroup.position.distanceToSquared(m.position) < playerStats.pickupRange**2) {
+                    m.position.lerp(playerGroup.position, 0.2);
+                    if (playerGroup.position.distanceToSquared(m.position) < 0.25) {
+                        gameState.bombs++; document.getElementById('bomb-val').innerText=gameState.bombs;
+                        createDamageText(playerGroup.position, "민초!", true); scene.remove(m); minchos.splice(i,1);
+                    }
+                } else m.rotation.y += 0.1;
+            }
+
+            // 경험치바 UI
+            document.getElementById('exp-bar').style.width = `${(gameState.exp/gameState.maxExp)*100}%`;
+
+            renderer.render(scene, camera);
+        }
+
+        // --- 기타 함수들 (레벨업 등) ---
+        function checkLevelUp() {
+            if(gameState.exp >= gameState.maxExp) {
+                gameState.exp -= gameState.maxExp; gameState.level++; gameState.maxExp *= 1.5;
+                document.getElementById('level-val').innerText = gameState.level;
+                showLevelUpModal();
+            }
+        }
+        function showLevelUpModal() {
+            gameState.isPaused = true;
+            const m = document.getElementById('levelup-modal'); m.style.display = 'flex';
+            const c = document.getElementById('upgrade-cards'); c.innerHTML = '';
+            const opts = [
+                {k:'qrBeam',t:'QR 빔',d:'공격력 UP',i:'📱'}, {k:'nftContract',t:'NFT 계약서',d:'확률/딜 UP',i:'📄'},
+                {k:'mist',t:'타지리 독',d:'범위 UP',i:'☠️'}, {k:'chunjat',t:'춘잣',d:'이속 UP',i:'🌰'},
+                {k:'movingMan',t:'무빙맨',d:'공속 UP',i:'🏃'}, {k:'clover',t:'클로버',d:'파워 UP',i:'🍀'}
+            ];
+            opts.sort(()=>Math.random()-0.5).slice(0,3).forEach(o => {
+                const el = document.createElement('div'); el.className='upgrade-card';
+                el.innerHTML = `<div class="card-icon">${o.i}</div><div class="card-name">${o.t}</div><div class="card-desc">${o.d}</div>`;
+                el.onclick = () => { applyUpgrade(o.k); m.style.display='none'; gameState.isPaused=false; };
+                c.appendChild(el);
+            });
+        }
+        function applyUpgrade(k) {
+            const i = inventory[k]; i.level++;
+            if(k==='qrBeam') { i.damage+=5; i.cooldown*=0.9; }
+            else if(k==='nftContract') { i.throwChance+=0.01; i.bossDmgRate+=0.03; }
+            else if(k==='mist') { i.damage+=2; i.range+=0.5; }
+            else if(k==='chunjat') playerStats.moveSpeed+=i.val;
+            else if(k==='movingMan') playerStats.attackSpeed+=i.val;
+            else if(k==='clover') playerStats.damageMult+=i.val;
+        }
+        function gameOver() { gameState.isPlaying = false; document.getElementById('game-over-screen').style.display='flex'; }
+
+        // 리사이즈
+        window.addEventListener('resize', () => {
+            const w=window.innerWidth, h=window.innerHeight, asp=w/h, s=40;
+            camera.left = -s*asp; camera.right = s*asp; camera.top = s; camera.bottom = -s;
+            camera.updateProjectionMatrix();
+            startCams.forEach(c => { c.aspect = w/h; c.updateProjectionMatrix(); });
+            renderer.setSize(w, h);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
