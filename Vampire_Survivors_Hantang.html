@@ -45,6 +45,7 @@
         #ult-guide { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,0.7); font-size: 18px; opacity: 0; transition: opacity 0.5s; }
         .damage-text { position: absolute; color: white; font-weight: bold; font-size: 20px; pointer-events: none; text-shadow: 1px 1px 0 #000; animation: popUp 0.8s forwards; white-space: nowrap; }
         .mincho-text { color: #00ffaa !important; font-size: 24px !important; text-shadow: 0 0 5px #00ffaa; }
+        .magnet-text { color: #ff3333 !important; font-size: 24px !important; text-shadow: 0 0 5px #ff0000; }
         .death-quote { color: #ffff00; font-size: 18px; font-family: 'Gowun Batang', serif; text-shadow: 1px 1px 2px #000; z-index: 5; }
         @keyframes float { 0% { transform: translateY(0); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0); } }
         @keyframes popUp { 0% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-40px) scale(0.8); } }
@@ -116,21 +117,29 @@
             female: new THREE.CylinderGeometry(0.4, 0.4, 1.5, 8),
             boss: new THREE.BoxGeometry(2, 4, 2),
             hpBg: new THREE.PlaneGeometry(1, 0.15),
-            hpFg: new THREE.PlaneGeometry(1, 0.15)
+            hpFg: new THREE.PlaneGeometry(1, 0.15),
+            gem: new THREE.OctahedronGeometry(0.3),
+            bigGem: new THREE.OctahedronGeometry(0.6), // 보스용 대왕 보석
+            vacuum: new THREE.BoxGeometry(0.5, 0.5, 0.5), // 자석 아이템
+            mincho: new THREE.SphereGeometry(0.4, 4, 4)
         };
         GEOMETRY.hpFg.translate(0.5, 0, 0); // 체력바 왼쪽 정렬
 
         const MATERIALS = {
             qr: new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
             contract: new THREE.MeshStandardMaterial({ color: 0xffffff }),
-            heart: new THREE.MeshBasicMaterial({ color: 0xff0055 }), // Basic으로 변경 (연산 감소)
+            heart: new THREE.MeshBasicMaterial({ color: 0xff0055 }), 
             male: new THREE.MeshStandardMaterial({ color: 0x3366ff }),
             female: new THREE.MeshStandardMaterial({ color: 0xff66cc }),
             boss: new THREE.MeshStandardMaterial({ color: 0xff4400 }),
             hpBg: new THREE.MeshBasicMaterial({ color: 0x333333, depthTest: false }),
             hpRed: new THREE.MeshBasicMaterial({ color: 0xff0000, depthTest: false }),
             hpGreen: new THREE.MeshBasicMaterial({ color: 0x00ff00, depthTest: false }),
-            hpBoss: new THREE.MeshBasicMaterial({ color: 0xffaa00, depthTest: false })
+            hpBoss: new THREE.MeshBasicMaterial({ color: 0xffaa00, depthTest: false }),
+            gem: new THREE.MeshBasicMaterial({ color: 0x00ffff }),
+            bigGem: new THREE.MeshBasicMaterial({ color: 0xffd700 }), // 골드색 대왕 보석
+            vacuum: new THREE.MeshBasicMaterial({ color: 0xff0000 }), // 빨간색 자석
+            mincho: new THREE.MeshBasicMaterial({ color: 0x00ffaa })
         };
 
         // 오브젝트 풀 (메모리 재활용 창고)
@@ -138,7 +147,7 @@
             enemies: [],
             projectiles: [],
             enemyProjectiles: [],
-            damageTexts: [] // DOM 요소도 제한
+            damageTexts: [] 
         };
         const MAX_POOL_SIZE = { enemy: 200, projectile: 100, enemyProjectile: 50 }; // 최대 개수 제한
 
@@ -162,10 +171,10 @@
         startCams[1].position.set(0, 2, 6); startCams[1].lookAt(0, 1, 0);
         startCams[2].position.set(0, 10, 0); startCams[2].lookAt(0, 0, 0);
 
-        const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" }); // 안티알리어싱 끔 (성능)
+        const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" }); 
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.BasicShadowMap; // 가장 싼 그림자
+        renderer.shadowMap.type = THREE.BasicShadowMap; 
         document.getElementById('canvas-container').appendChild(renderer.domElement);
 
         const ambientLight = new THREE.AmbientLight(0x606060);
@@ -208,9 +217,9 @@
         function initPools() {
             // 적 풀 생성
             for(let i=0; i<MAX_POOL_SIZE.enemy; i++) {
-                const mesh = new THREE.Mesh(GEOMETRY.male, MATERIALS.male); // 기본값 male
+                const mesh = new THREE.Mesh(GEOMETRY.male, MATERIALS.male); 
                 mesh.visible = false;
-                mesh.castShadow = false; // 일반 적 그림자 끔 (성능)
+                mesh.castShadow = false; 
                 
                 // 체력바 미리 부착
                 const hpGroup = new THREE.Group();
@@ -220,7 +229,7 @@
                 hpFg.position.x = -0.5; hpFg.position.z = 0.01;
                 hpGroup.add(hpFg);
                 mesh.add(hpGroup);
-                mesh.userData.hpFg = hpFg; // 빠른 접근용
+                mesh.userData.hpFg = hpFg; 
                 mesh.userData.hpGroup = hpGroup;
 
                 scene.add(mesh);
@@ -253,6 +262,9 @@
             if(gltf.animations.length) playerMixer.clipAction(gltf.animations[0]).play();
         });
 
+        loader.load('./male_enemy.glb', (gltf) => { loadedModels.maleEnemy = gltf; }, undefined, () => {});
+        loader.load('./female_enemy.glb', (gltf) => { loadedModels.femaleEnemy = gltf; }, undefined, () => {});
+
         // ==========================================
         // 3. 게임 로직
         // ==========================================
@@ -266,6 +278,7 @@
         const activeEnemyProjectiles = [];
         const gems = [];
         const minchos = [];
+        const vacuums = []; // 자석 아이템 목록
 
         const playerStats = { moveSpeed: 0.15, damageMult: 1.0, pickupRange: 3.0, attackSpeed: 1.0 };
         const inventory = {
@@ -294,9 +307,8 @@
         function spawnEnemy(isBoss = false) {
             if (gameState.isPaused) return;
             
-            // 사용 가능한(숨겨진) 메쉬 찾기
             const mesh = POOLS.enemies.find(e => !e.visible);
-            if (!mesh) return; // 풀 꽉 참 (더 이상 생성 안함 = 렉 방지)
+            if (!mesh) return; 
 
             const angle = Math.random() * Math.PI * 2;
             const dist = 15 + Math.random() * 10;
@@ -311,7 +323,7 @@
             // 타입에 따라 메쉬 설정 재활용
             mesh.geometry = GEOMETRY[type];
             mesh.material = MATERIALS[type];
-            mesh.castShadow = isBoss; // 보스만 그림자
+            mesh.castShadow = isBoss; 
             
             // 위치 리셋
             mesh.position.set(x, isBoss ? 2 : 0.75, z);
@@ -322,14 +334,14 @@
             mesh.userData.hpFg.material = hpMat;
             mesh.userData.hpGroup.position.y = isBoss ? 2.5 : 1.5;
             mesh.userData.hpGroup.scale.set(isBoss?3:1, isBoss?2:1, 1);
-            mesh.userData.hpFg.scale.x = 1; // 체력 가득
+            mesh.userData.hpFg.scale.x = 1; 
 
             // 데이터 리셋
             mesh.userData = { 
                 type: type, hp: hp, maxHp: hp, 
                 speed: isBoss ? 0.03 : (type === 'female' ? 0.04 : 0.05),
                 attackCooldown: 0, isBoss: isBoss,
-                hpFg: mesh.userData.hpFg, // 참조 유지
+                hpFg: mesh.userData.hpFg, 
                 hpGroup: mesh.userData.hpGroup
             };
 
@@ -346,9 +358,8 @@
             
             mesh.position.copy(pos);
             mesh.visible = true;
-            mesh.userData = { ...userData, life: userData.duration || 2 }; // 복사
+            mesh.userData = { ...userData, life: userData.duration || 2 }; 
             
-            // 방향 바라보기
             if (type === 'enemy') mesh.lookAt(playerGroup.position);
             else if (type === 'qr') mesh.lookAt(pos.x + dir.x, pos.y, pos.z + dir.z);
 
@@ -360,22 +371,23 @@
         function takeDamage(enemy, amount) {
             enemy.userData.hp -= amount;
             
-            // 3D 체력바 업데이트
             const pct = Math.max(0, enemy.userData.hp / enemy.userData.maxHp);
             enemy.userData.hpFg.scale.x = pct;
 
-            // 데미지 텍스트 (DOM 제한)
-            if (Math.random() < 0.3) createDamageText(enemy.position, Math.floor(amount)); // 너무 많으면 정신없으니 30%만 표시
+            if (Math.random() < 0.3) createDamageText(enemy.position, Math.floor(amount)); 
 
             if (enemy.userData.hp <= 0) {
-                // 죽음 처리
                 if (Math.random() * 100 < gameState.quoteChance && deathQuotes[enemy.userData.type]) {
                     const q = deathQuotes[enemy.userData.type];
                     createDamageText(enemy.position, q[Math.floor(Math.random()*q.length)], false, true);
                 }
                 
-                spawnGem(enemy.position, enemy.userData.isBoss ? 50 : 1);
-                if(Math.random()<0.01) spawnMincho(enemy.position);
+                // 경험치 보석 드랍 (보스는 대왕 보석)
+                spawnGem(enemy.position, enemy.userData.isBoss ? 100 : 1, enemy.userData.isBoss);
+                
+                // 아이템 드랍 (민초, 자석)
+                if(Math.random() < 0.01) spawnMincho(enemy.position);
+                if(Math.random() < 0.01) spawnVacuum(enemy.position);
                 
                 gameState.kills++;
                 document.getElementById('kill-count').innerText = gameState.kills;
@@ -387,13 +399,14 @@
             }
         }
 
-        // 텍스트는 DOM 사용 (개수 제한으로 최적화)
         let dmgTextCount = 0;
         function createDamageText(pos, text, isMincho, isQuote) {
-            if (dmgTextCount > 20 && !isMincho && !isQuote) return; // 20개 넘으면 생략
+            if (dmgTextCount > 20 && !isMincho && !isQuote) return; 
             
             const div = document.createElement('div');
-            div.className = isQuote ? 'damage-text death-quote' : (isMincho ? 'damage-text mincho-text' : 'damage-text');
+            // 자석용 클래스 추가
+            if (text === "자석 발동!") div.className = 'damage-text magnet-text';
+            else div.className = isQuote ? 'damage-text death-quote' : (isMincho ? 'damage-text mincho-text' : 'damage-text');
             div.innerText = text;
             
             _tempVec1.copy(pos);
@@ -403,7 +416,7 @@
             const x = (_tempVec1.x * .5 + .5) * window.innerWidth;
             const y = (-(_tempVec1.y * .5) + .5) * window.innerHeight;
             
-            if(x<0||x>window.innerWidth||y<0||y>window.innerHeight) return; // 화면 밖이면 생성 안함
+            if(x<0||x>window.innerWidth||y<0||y>window.innerHeight) return; 
 
             div.style.left = x + 'px'; div.style.top = y + 'px';
             document.getElementById('damage-layer').appendChild(div);
@@ -411,16 +424,25 @@
             setTimeout(() => { div.remove(); dmgTextCount--; }, isQuote ? 2000 : 800);
         }
 
-        // 아이템 (젬, 민초) - 여기는 간단히 Mesh 생성/삭제 유지 (개수가 적어서)
-        function spawnGem(pos, val) {
-            const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.3), new THREE.MeshBasicMaterial({color:0x00ffff}));
-            m.position.copy(pos); m.position.y=0.5; m.userData={val:val};
+        // 아이템 (젬, 민초, 자석)
+        function spawnGem(pos, val, isBig) {
+            // 최적화: 메쉬 생성
+            const geo = isBig ? GEOMETRY.bigGem : GEOMETRY.gem;
+            const mat = isBig ? MATERIALS.bigGem : MATERIALS.gem;
+            const m = new THREE.Mesh(geo, mat);
+            m.position.copy(pos); m.position.y=0.5; 
+            m.userData = { val: val, magnetized: false }; // 자석 상태 추가
             scene.add(m); gems.push(m);
         }
         function spawnMincho(pos) {
-            const m = new THREE.Mesh(new THREE.SphereGeometry(0.4,4,4), new THREE.MeshBasicMaterial({color:0x00ffaa}));
+            const m = new THREE.Mesh(GEOMETRY.mincho, MATERIALS.mincho);
             m.position.copy(pos); m.position.y=0.5;
             scene.add(m); minchos.push(m);
+        }
+        function spawnVacuum(pos) {
+            const m = new THREE.Mesh(GEOMETRY.vacuum, MATERIALS.vacuum);
+            m.position.copy(pos); m.position.y=0.5;
+            scene.add(m); vacuums.push(m);
         }
 
         function getNearest() {
@@ -467,8 +489,6 @@
                     document.getElementById(`cam-label-${gameState.cameraIndex}`).classList.add('cam-active');
                 }
                 const cams = [startCams[0], startCams[1], startCams[2]];
-                
-                // 풀스크린 렌더링
                 renderer.render(scene, cams[gameState.cameraIndex]);
                 return;
             }
@@ -480,7 +500,6 @@
                 if(gameState.bombs > 0) {
                     gameState.bombs--;
                     document.getElementById('bomb-val').innerText = gameState.bombs;
-                    // 활성 적 전체 즉사 처리
                     for(let i=activeEnemies.length-1; i>=0; i--) takeDamage(activeEnemies[i], 99999);
                     keys[' '] = false;
                 }
@@ -500,13 +519,12 @@
                 if(playerMixer) playerGroup.children.forEach(c=>{if(c.isGroup) c.rotation.y=rot;});
             }
 
-            // 카메라 추적
             camera.position.set(playerGroup.position.x+20, 20, playerGroup.position.z+20);
             dirLight.position.set(playerGroup.position.x+10, 20, playerGroup.position.z+10);
-            ground.position.set(playerGroup.position.x, 0, playerGroup.position.z); // 무한 바닥
+            ground.position.set(playerGroup.position.x, 0, playerGroup.position.z); 
 
             // 렌더링 최적화: 플레이어 체력바 빌보드
-            const pHp = playerGroup.children.find(c=>c.children && c.children.length>1); // 대충 찾기
+            const pHp = playerGroup.children.find(c=>c.children && c.children.length>1); 
             if(pHp) {
                 pHp.lookAt(camera.position.x, 1000, camera.position.z);
                 pHp.children[1].scale.x = Math.max(0, gameState.hp/gameState.maxHp);
@@ -551,7 +569,7 @@
 
             if(playerMixer) playerMixer.update(delta);
 
-            // --- 업데이트 루프 (역순 순회 X, 풀링이므로 visible 체크) ---
+            // --- 업데이트 루프 ---
             
             // 1. 투사체
             for (let i = activeProjectiles.length - 1; i >= 0; i--) {
@@ -564,11 +582,10 @@
                 
                 if (p.userData.life <= 0) { p.visible = false; activeProjectiles.splice(i, 1); continue; }
 
-                // 충돌 체크 (거리 제곱)
                 for (const e of activeEnemies) {
                     const dx = p.position.x - e.position.x;
                     const dz = p.position.z - e.position.z;
-                    if (dx*dx + dz*dz < 2.25) { // 1.5^2
+                    if (dx*dx + dz*dz < 2.25) { 
                         if (p.userData.hitList && p.userData.hitList.includes(e.uuid)) continue;
                         
                         let dmg = p.userData.damage;
@@ -593,7 +610,7 @@
                 
                 const dx = p.position.x - playerGroup.position.x;
                 const dz = p.position.z - playerGroup.position.z;
-                if (dx*dx + dz*dz < 1) { // 플레이어 피격
+                if (dx*dx + dz*dz < 1) { 
                     gameState.hp = Math.max(0, gameState.hp - p.userData.damage);
                     document.getElementById('hp-val').innerText = Math.floor(gameState.hp);
                     if(gameState.hp<=0) gameOver();
@@ -604,7 +621,6 @@
 
             // 3. 적
             for (const e of activeEnemies) {
-                // 체력바 빌보드
                 e.userData.hpGroup.lookAt(camera.position.x, 1000, camera.position.z);
                 e.userData.hpGroup.rotation.x = -Math.PI/2;
 
@@ -613,16 +629,16 @@
 
                 if (e.userData.type === 'male' || e.userData.type === 'boss') {
                     e.position.add(_tempVec2.multiplyScalar(e.userData.speed));
-                    if (distSq < (e.userData.isBoss ? 6.25 : 0.64)) { // 2.5^2 or 0.8^2
-                        gameState.hp -= (e.userData.isBoss ? 0.2 : 0.05); // 데미지 빈도 조절
+                    if (distSq < (e.userData.isBoss ? 6.25 : 0.64)) { 
+                        gameState.hp -= (e.userData.isBoss ? 0.2 : 0.05); 
                         document.getElementById('hp-val').innerText = Math.floor(gameState.hp);
                         if(gameState.hp<=0) gameOver();
                     }
-                } else { // 원거리
+                } else { 
                     if (distSq > 64) e.position.add(_tempVec2.multiplyScalar(e.userData.speed));
                     e.userData.attackCooldown -= delta;
                     if (e.userData.attackCooldown <= 0 && distSq < 144) {
-                        _tempVec2.normalize(); // 방향 재정규화
+                        _tempVec2.normalize(); 
                         spawnProjectile('enemy', e.position, null, { velocity: _tempVec2.multiplyScalar(0.15), damage: 10, duration: 4 });
                         e.userData.attackCooldown = 2.0;
                     }
@@ -630,16 +646,21 @@
                 e.lookAt(playerGroup.position);
             }
 
-            // 아이템
+            // 4. 아이템 (보석, 민초, 자석)
+            // 보석(Gem)
             for (let i=gems.length-1; i>=0; i--) {
                 const g = gems[i];
-                if (playerGroup.position.distanceToSquared(g.position) < playerStats.pickupRange**2) {
-                    g.position.lerp(playerGroup.position, 0.2);
+                // 자석 상태거나 픽업 범위 내
+                if (g.userData.magnetized || playerGroup.position.distanceToSquared(g.position) < playerStats.pickupRange**2) {
+                    _tempVec2.subVectors(playerGroup.position, g.position).normalize();
+                    // 자석 상태면 더 빠르게
+                    g.position.add(_tempVec2.multiplyScalar(g.userData.magnetized ? 0.8 : 0.3));
                     if (playerGroup.position.distanceToSquared(g.position) < 0.25) {
                         gameState.exp += g.userData.val; scene.remove(g); gems.splice(i,1); checkLevelUp();
                     }
                 } else g.rotation.y += 0.1;
             }
+            // 민초(Mincho)
             for (let i=minchos.length-1; i>=0; i--) {
                 const m = minchos[i];
                 if (playerGroup.position.distanceToSquared(m.position) < playerStats.pickupRange**2) {
@@ -650,8 +671,20 @@
                     }
                 } else m.rotation.y += 0.1;
             }
+            // 자석(Vacuum)
+            for (let i=vacuums.length-1; i>=0; i--) {
+                const v = vacuums[i];
+                if (playerGroup.position.distanceToSquared(v.position) < playerStats.pickupRange**2) {
+                    v.position.lerp(playerGroup.position, 0.2);
+                    if (playerGroup.position.distanceToSquared(v.position) < 0.25) {
+                        // 모든 보석 끌어오기
+                        gems.forEach(g => g.userData.magnetized = true);
+                        createDamageText(playerGroup.position, "자석 발동!"); 
+                        scene.remove(v); vacuums.splice(i,1);
+                    }
+                } else v.rotation.y += 0.1;
+            }
 
-            // 경험치바 UI
             document.getElementById('exp-bar').style.width = `${(gameState.exp/gameState.maxExp)*100}%`;
 
             renderer.render(scene, camera);
